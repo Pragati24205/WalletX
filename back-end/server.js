@@ -258,6 +258,50 @@ app.put('/api/profile/password', (req, res) => {
   // Demo backend: no password checks — accept anything for demo purposes
   res.json({ success: true, message: "Password updated (demo)" });
 });
+// POST /api/quiz/submit
+app.post('/api/quiz/submit', (req, res) => {
+  const { userId = 1, lessonId, answers } = req.body;
+
+  const correct = QUIZ_ANSWERS[lessonId];
+  if (!correct) return res.status(400).json({ error: "Quiz not found" });
+
+  let correctCount = 0;
+  for (let i = 0; i < correct.length; i++) {
+    if (answers[i] === correct[i]) correctCount++;
+  }
+  const total = correct.length;
+  const percent = (correctCount / total) * 100;
+  const passed = percent >= 60;
+  const pointsEarned = passed ? correctCount * 10 : 0;
+
+  // update user points
+  const user = users.find(u => u.id === Number(userId));
+  if (user) user.points = (user.points || 0) + (passed ? pointsEarned : 0);
+
+  // update the lesson
+  const lessonIdx = lessons.findIndex(l => l.id === lessonId);
+  const lesson = lessons[lessonIdx];
+  if (lesson) {
+    lesson.progress = passed ? 100 : Math.round(percent);
+    lesson.locked = passed ? false : lesson.locked;
+
+    // IMPORTANT: unlock the next lesson if passed
+    if (passed && lessonIdx !== -1 && lessonIdx + 1 < lessons.length) {
+      lessons[lessonIdx + 1].locked = false;
+    }
+  }
+
+  res.json({
+    correctCount,
+    total,
+    percent,
+    passed,
+    pointsEarned: passed ? pointsEarned : 0,
+    newPointsTotal: user ? user.points : null,
+    updatedLesson: lesson || null,
+  });
+});
+
 
 // -------------------------
 // START SERVER

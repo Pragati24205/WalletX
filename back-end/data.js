@@ -15,8 +15,8 @@ module.exports = {
 
   // community posts
   communityPosts: [
-    { id: 1, author: "Emma Davis", initial: "E", time: "1 day ago", text: "Completed all beginner lessons! The tips on tracking expenses are so helpful." },
-    { id: 2, author: "Mike Chen", initial: "M", time: "5 hours ago", text: "Anyone else using the 50-30-20 budgeting rule? It's been a game-changer for me!" }
+    { id: 1, author: "Vivek Vardhan", initial: "E", time: "1 day ago", text: "Completed all beginner lessons! The tips on tracking expenses are so helpful." },
+    { id: 2, author: "Venu", initial: "M", time: "5 hours ago", text: "Anyone else using the 50-30-20 budgeting rule? It's been a game-changer for me!" }
   ],
 
   // demo users

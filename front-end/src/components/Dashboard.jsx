@@ -357,20 +357,182 @@ export default function Dashboard({ user }) {
   // --------------------------
   // LESSONS PAGE
   // --------------------------
-  const LessonsPage = () => (
+const LessonsPage = () => {
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [leaderboardErr, setLeaderboardErr] = useState(null);
+
+  // load leaderboard on demand
+  async function loadLeaderboard() {
+    if (leaderboard || loadingLeaderboard) return;
+    setLoadingLeaderboard(true);
+    setLeaderboardErr(null);
+    try {
+      // try to fetch a real leaderboard endpoint if you add one server-side
+      const res = await api.get('/leaderboard'); // optional - backend may not exist
+      // expect res = [{ name, points, rank }, ...] or similar
+      if (Array.isArray(res)) {
+        setLeaderboard(res);
+      } else {
+        throw new Error('unexpected leaderboard response');
+      }
+    } catch (err) {
+      // fallback: create a mock leaderboard including current user and some demo users
+      const demo = [
+        { name: 'Aisha', points: 320 },
+        { name: 'Ravi', points: 280 },
+        { name: user?.name || 'You', points: (user?.points || 150) },
+        { name: 'Sam', points: 120 },
+        { name: 'Nina', points: 90 },
+      ];
+      // sort descending by points
+      demo.sort((a, b) => b.points - a.points);
+      setLeaderboard(demo);
+      setLeaderboardErr(String(err?.message || 'Using fallback leaderboard'));
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  }
+
+  function openLeaderboard() {
+    setShowLeaderboard(true);
+    loadLeaderboard();
+  }
+  function closeLeaderboard() {
+    setShowLeaderboard(false);
+  }
+
+  // helper to normalize id
+  const norm = id => String(id);
+
+  return (
     <div className="page page--fade">
       <section className="section">
-        <h3>Learn & Grow</h3>
-        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-          {lessons.map(l => (
-            <div key={l.id} onClick={() => handleStartLesson(l)} style={{ cursor: "pointer" }}>
-              <GamifiedLessonItem lesson={l} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Learn & Grow</h3>
+            <div style={{ color: '#6b7280', marginTop: 6, fontSize: 13 }}>Complete lessons to earn points and unlock next modules</div>
+          </div>
+
+          {/* Leaderboard card (compact) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={openLeaderboard}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openLeaderboard(); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 14px',
+                borderRadius: 12,
+                background: 'linear-gradient(90deg, rgba(124,58,237,0.08), rgba(96,165,250,0.08))',
+                cursor: 'pointer',
+                boxShadow: '0 6px 18px rgba(99,102,241,0.06)',
+              }}
+              aria-label="Open leaderboard"
+            >
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(90deg,var(--purple),var(--blue))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700 }}>
+                🌟
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 700 }}>Leaderboard</div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>Top ranks</div>
+              </div>
             </div>
-          ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+          {lessons.map((l) => {
+            const lessonIdStr = norm(l.id);
+            const isLocked = Boolean(l.locked);
+            const progress = Number(l.progress || 0);
+
+            return (
+              <div
+                key={lessonIdStr}
+                role={isLocked ? 'article' : 'button'}
+                tabIndex={isLocked ? -1 : 0}
+                onClick={() => { if (!isLocked) handleStartLesson(l); }}
+                onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !isLocked) { e.preventDefault(); handleStartLesson(l); } }}
+                style={{
+                  cursor: isLocked ? 'not-allowed' : 'pointer',
+                  opacity: isLocked ? 0.78 : 1,
+                  transition: 'transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease',
+                }}
+                aria-disabled={isLocked}
+                aria-label={`${l.title} ${isLocked ? 'locked' : `progress ${progress}%`}`}
+              >
+                <GamifiedLessonItem
+                  lesson={l}
+                  onStart={() => { if (!isLocked) handleStartLesson(l); }}
+                />
+              </div>
+            );
+          })}
         </div>
       </section>
+
+      {/* Leaderboard Modal */}
+      {showLeaderboard && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1200,
+          padding: 16,
+        }}>
+          <div style={{ width: '100%', maxWidth: 720, background: 'white', borderRadius: 12, padding: 18, boxShadow: '0 18px 60px rgba(2,6,23,0.28)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <h3 style={{ margin: 0 }}>Leaderboard</h3>
+                <div style={{ color: '#6b7280', fontSize: 13 }}>Top users by points</div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                
+                <button onClick={closeLeaderboard} style={{ padding: 8, borderRadius: 8, border: 'none', background: '#f3f4f6', cursor: 'pointer' }}>Close</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              {(leaderboard || []).map((u, i) => (
+                <div key={u.name + i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, background: i === 0 ? 'linear-gradient(90deg, rgba(124,58,237,0.06), rgba(96,165,250,0.06))' : 'white', borderRadius: 10, boxShadow: '0 6px 16px rgba(2,6,23,0.03)' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: i === 0 ? 'linear-gradient(90deg,var(--purple),var(--blue))' : '#eef2ff', color: i === 0 ? 'white' : '#7c3aed', fontWeight: 700 }}>
+                      {i + 1}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{u.name === (user?.name) ? `${u.name} (You)` : u.name}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>{u.tag || ''}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, color: 'var(--purple)' }}>{u.points} pts</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af' }}>{u.rank ? `Rank ${u.rank}` : ''}</div>
+                  </div>
+                </div>
+              ))}
+
+              {(!leaderboard || leaderboard.length === 0) && !loadingLeaderboard && (
+                <div style={{ color: '#6b7280' }}>No leaderboard data available.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+
 
   // --------------------------
   // COMMUNITY PAGE
@@ -438,12 +600,6 @@ export default function Dashboard({ user }) {
   // --------------------------
   // PROFILE PAGE
   // --------------------------
-  // --------------------------
-// PROFILE PAGE (CLEAN + WORKING)
-// --------------------------
-// --------------------------
-// PROFILE PAGE
-// --------------------------
 const ProfilePage = () => {
   if (showAchievementsInProfile)
     return <AchievementsView onBack={() => setShowAchievementsInProfile(false)} />;
